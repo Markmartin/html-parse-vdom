@@ -1,3 +1,4 @@
+import { Element } from '../vdom/element.js'
 // token type define
 const tokenType = {
   START_TAG: 'START_TAG',
@@ -34,9 +35,7 @@ Array.prototype.last = function () {
 }
 
 // tokenizer
-const htmlTokenParse = function (html) {
-  function matchStart() {}
-
+const htmlTokenParse = function (html, handler = {}) {
   let chars = false
   let match = null
   let stack = []
@@ -51,25 +50,31 @@ const htmlTokenParse = function (html) {
       if (match) {
         const [matchStr, tagStr, attrStr] = match
         html = html.substring(matchStr.length)
-        stack.push({ type: tokenType.START_TAG, tag: tagStr.toLowerCase(), attrsMap: {} })
-        // update attrbute
+
+        const token = { type: tokenType.START_TAG, tag: tagStr.toLowerCase(), attrsMap: {} }
         if (!!attrStr) {
           const attrArr = attrStr.match(allAttr)
           if (attrArr.length > 0) {
-            const attrsMap = stack.last().attrsMap
             attrArr.forEach((str) => {
               const attrMatch = str.match(attr)
               if (attrMatch) {
                 const [_, attrName, attrValue = null] = attrMatch
-                attrsMap[attrName] = attrValue
+                token.attrsMap[attrName] = attrValue
               }
             })
           }
+        }
+        stack.push(token)
+        if (handler.start) {
+          handler.start(stack.last().tag, stack.last().attrsMap)
         }
 
         // self-close-tag
         if (match.last() === '/') {
           stack.push({ type: tokenType.END_TAG, tag: tagStr.toLowerCase() })
+          if (handler.end) {
+            handler.end(stack.last().tag)
+          }
         }
 
         chars = false
@@ -84,7 +89,9 @@ const htmlTokenParse = function (html) {
         const [matchStr, tagStr] = match
         html = html.substring(matchStr.length)
         stack.push({ type: tokenType.END_TAG, tag: tagStr.toLowerCase() })
-
+        if (handler.end) {
+          handler.end(stack.last().tag)
+        }
         chars = false
         continue
       }
@@ -96,45 +103,48 @@ const htmlTokenParse = function (html) {
       const text = index < 0 ? html : html.substring(0, index)
       html = index < 0 ? null : html.substring(index)
       stack.push({ type: tokenType.TEXT, content: text })
+      if (handler.chars) {
+        handler.chars(stack.last().content)
+      }
     }
   }
 
   return stack
 }
 
-// match root level
-function matchRoot(tagToken, tokens = []) {
-  const tokenArr = []
-  let match = { matchIndex: -1, root: false }
+// ast parse
+const htmlASTParse = function (tokens) {
+  // match root level
+  function matchRoot(tagToken, tokens = []) {
+    const tokenArr = []
+    let match = { matchIndex: -1, root: false }
 
-  if (!tokens || tokens.length === 0) {
+    if (!tokens || tokens.length === 0) {
+      return match
+    }
+
+    tokens.forEach((token, index) => {
+      if (token.type === tagToken.type && token.tag === tagToken.tag) {
+        tokenArr.push(token)
+        return
+      }
+
+      if (token.type === tokenType.END_TAG && tagToken.tag === token.tag) {
+        if (tokenArr.length > 0) {
+          tokenArr.pop()
+          return
+        }
+
+        if (tokenArr.length === 0) {
+          match = { matchIndex: index, root: index === tokens.length - 1 ? true : false }
+          return
+        }
+      }
+    })
+
     return match
   }
 
-  tokens.forEach((token, index) => {
-    if (token.type === tagToken.type && token.tag === tagToken.tag) {
-      tokenArr.push(token)
-      return
-    }
-
-    if (token.type === tokenType.END_TAG && tagToken.tag === token.tag) {
-      if (tokenArr.length > 0) {
-        tokenArr.pop()
-        return
-      }
-
-      if (tokenArr.length === 0) {
-        match = { matchIndex: index, root: index === tokens.length - 1 ? true : false }
-        return
-      }
-    }
-  })
-
-  return match
-}
-
-// ast parse
-const htmlASTParse = function (tokens) {
   const domTree = []
   // 空树
   if (!tokens || tokens.length === 0) {
@@ -184,12 +194,74 @@ const htmlASTParse = function (tokens) {
   return domTree
 }
 
-const simpleHtmlStr = `<div class="root" @click="clickEvent"><div class="child-1"><img class="child-1-1" src="xxxx" alt="xxx" /><p class="child-1-2">666</p></div><div class="child-2"><span class="child-2-1">span666</span><p class="child-2-2">p6666</p></div></div>`
+const htmlDomParse = function (html, mountedDom) {
+  const elements = []
+  let currentDom = mountedDom || document.body
+  htmlTokenParse(html, {
+    start: (tagName, attrs) => {
+      const dom = document.createElement(tagName)
+      for (const key in attrs) {
+        dom.setAttribute(key, attrs[key])
+      }
+      elements.push(dom)
+      currentDom.appendChild(dom)
+      currentDom = dom
+    },
+    end: (tagName) => {
+      elements.length -= 1
+      currentDom = elements[elements.length - 1]
+    },
+    chars: (text) => {
+      const textDom = document.createTextNode(text)
+      currentDom.appendChild(textDom)
+    }
+  })
 
-const htmlTokens = htmlTokenParse(simpleHtmlStr)
+  return mountedDom || document.body
+}
 
-console.log(htmlTokens)
+const htmlVdomParse = function (html) {
+  const elements = []
+  let currentvDom = null
+  htmlTokenParse(html, {
+    start: (tagName, attrs) => {
+      const vDom = new Element(tagName, attrs)
 
-const ast = htmlASTParse(htmlTokens)
+      elements.push(vDom)
 
-console.log(ast)
+      if (!currentvDom) {
+        currentvDom = vDom
+        return
+      }
+
+      if (currentvDom) {
+        currentvDom.children.push(vDom)
+        currentvDom = vDom
+        return
+      }
+    },
+    end: (tagName) => {
+      elements.length -= 1
+      if (elements.length > 0) {
+        currentvDom = elements[elements.length - 1]
+      }
+    },
+    chars: (text) => {
+      currentvDom.children.push(text)
+    }
+  })
+
+  return currentvDom
+}
+
+export { htmlTokenParse, htmlASTParse, htmlDomParse, htmlVdomParse }
+
+// const simpleHtmlStr = `<div class="root" @click="clickEvent"><div class="child-1"><img class="child-1-1" src="xxxx" alt="xxx" /><p class="child-1-2">666</p></div><div class="child-2"><span class="child-2-1">span666</span><p class="child-2-2">p6666</p></div></div>`
+
+// const htmlTokens = htmlTokenParse(simpleHtmlStr)
+
+// console.log(htmlTokens)
+
+// const ast = htmlASTParse(htmlTokens)
+
+// console.log(ast)
