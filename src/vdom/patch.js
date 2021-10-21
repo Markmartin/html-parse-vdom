@@ -31,7 +31,12 @@ function dfsWalk(dom, index, patches, isEnd = false) {
       }
 
       if (type === patchType.NODE_ATTRIBUTE_ADD || type === patchType.NODE_ATTRIBUTE_MODIFY) {
-        dom.setAttribute(patch.key, patch.value)
+        if (dom.tagName === 'INPUT' && patch.key === 'value') {
+          dom[patch.key] = patch.value
+        } else {
+          dom.setAttribute(patch.key, patch.value)
+        }
+
         return
       }
 

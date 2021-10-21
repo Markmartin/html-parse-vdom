@@ -19,7 +19,7 @@ function dfsWalk(oldNode, newNode, index, patches) {
   //   }
 
   // 删除节点
-  if (oldNode && !newNode) {
+  if (oldNode && !newNode && newNode !== '') {
     currentIndexPatches.push({ type: patchType.NODE_DELETE })
   }
 
@@ -68,8 +68,26 @@ function diffProps(oldProps, newProps, currentIndexPatches) {
   for (const propKey in oldProps) {
     if (!newProps.hasOwnProperty(propKey)) {
       currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_DELETE, key: propKey })
-    } else if (newProps[propKey] !== oldProps[propKey]) {
-      currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_MODIFY, key: propKey, value: newProps[propKey] })
+    } else if (newProps[propKey] !== oldProps[propKey] && propKey !== 'event') {
+      switch (propKey) {
+        case 'data':
+          {
+            for (const [key, value] of Object.entries(newProps[propKey])) {
+              if (!oldProps[propKey].hasOwnProperty(key)) {
+                currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_ADD, key, value })
+              }
+
+              if (oldProps[propKey].hasOwnProperty(key) && oldProps[propKey][key] !== newProps[propKey][key]) {
+                currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_MODIFY, key, value })
+              }
+            }
+          }
+          break
+        default:
+          currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_MODIFY, key: propKey, value: newProps[propKey] })
+          break
+      }
+      // currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_MODIFY, key: propKey, value: newProps[propKey] })
     }
   }
 
