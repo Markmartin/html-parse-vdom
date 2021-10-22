@@ -84,27 +84,27 @@ class Element {
         case 'data':
           {
             // 数据监听
-            for (const key in this.props[propKey]) {
-              const value = state.data ? state.data[this.props[propKey][key]] : this.props[propKey][key]
+            for (const [key, value] of Object.entries(this.props[propKey])) {
+              // const value = state.data ? state.data[this.props[propKey][key]] : this.props[propKey][key]
               dom.setAttribute(key, value)
             }
           }
           break
         case 'event':
           {
-            for (const eventName in this.props[propKey]) {
-              dom.addEventListener(
-                eventName,
-                function (e) {
-                  if (state.methods) {
-                    let func = state.methods[this.props[propKey][eventName]]
-                    if (typeof func === 'function') {
-                      // func = func.bind(state)
-                      func(e.target.value)
-                    }
-                  }
-                }.bind(this)
-              )
+            for (const [eventName, eventMethod] of Object.entries(this.props[propKey])) {
+              dom.addEventListener(eventName, function (e) {
+                if (typeof eventMethod === 'function') {
+                  eventMethod(e.target.value)
+                }
+                // if (state.methods) {
+                //   let func = state.methods[this.props[propKey][eventName]]
+                //   if (typeof func === 'function') {
+                //     // func = func.bind(state)
+                //     func(e.target.value)
+                //   }
+                // }
+              })
             }
           }
           break
@@ -142,105 +142,105 @@ class Element {
     }
 
     this.children.forEach((child) => {
-      let childDom = null
-      if (child instanceof Element) {
-        childDom = child.render(state)
-      }
+      // let childDom = null
+      // if (child instanceof Element) {
+      //   childDom = child.render(state)
+      // }
 
-      if (!(child instanceof Element)) {
-        const match = child.match(dynamicVariable)
-        if (match) {
-          const [_, variable] = match
-          if (state.data && state.data[variable]) {
-            childDom = document.createTextNode(state.data[variable])
-          } else {
-            childDom = document.createTextNode(child)
-          }
-        }
-        if (!match) {
-          childDom = document.createTextNode(child)
-        }
-      }
+      // if (!(child instanceof Element)) {
+      //   const match = child.match(dynamicVariable)
+      //   if (match) {
+      //     const [_, variable] = match
+      //     if (state.data && state.data[variable]) {
+      //       childDom = document.createTextNode(state.data[variable])
+      //     } else {
+      //       childDom = document.createTextNode(child)
+      //     }
+      //   }
+      //   if (!match) {
+      //     childDom = document.createTextNode(child)
+      //   }
+      // }
 
-      // const childDom = child instanceof Element ? child.render(state) : document.createTextNode(child)
-
-      if (childDom) {
-        dom.appendChild(childDom)
-      }
+      const childDom = child instanceof Element ? child.render(state) : document.createTextNode(child)
+      dom.appendChild(childDom)
+      // if (childDom) {
+      //   dom.appendChild(childDom)
+      // }
     })
 
     return dom
   }
 }
 
-const htmlVdomParse = function (html, data = null) {
-  const elements = []
-  let currentvDom = null
-  htmlTokenParse(html, {
-    start: (tagName, attrs) => {
-      let propsMap = {}
-      for (let attrKey in attrs) {
-        const match = attrKey.match(dynamicAttr)
-        if (match) {
-          const [_, funcSymbol, funcVariable] = match
-          if (funcSymbol === ':') {
-            // 监听值变化
-            propsMap.data = {
-              [funcVariable]: data ? data[attrs[attrKey]] : attrs[attrKey]
-            }
-          }
+// const htmlVdomParse = function (html, data = null) {
+//   const elements = []
+//   let currentvDom = null
+//   htmlTokenParse(html, {
+//     start: (tagName, attrs) => {
+//       let propsMap = {}
+//       for (let attrKey in attrs) {
+//         const match = attrKey.match(dynamicAttr)
+//         if (match) {
+//           const [_, funcSymbol, funcVariable] = match
+//           if (funcSymbol === ':') {
+//             // 监听值变化
+//             propsMap.data = {
+//               [funcVariable]: data ? data[attrs[attrKey]] : attrs[attrKey]
+//             }
+//           }
 
-          if (funcSymbol === '@') {
-            // 监听事件
-            propsMap.event = {
-              [funcVariable]: attrs[attrKey]
-            }
-          }
-        }
+//           if (funcSymbol === '@') {
+//             // 监听事件
+//             propsMap.event = {
+//               [funcVariable]: attrs[attrKey]
+//             }
+//           }
+//         }
 
-        if (!match) {
-          propsMap[attrKey] = attrs[attrKey]
-        }
-      }
+//         if (!match) {
+//           propsMap[attrKey] = attrs[attrKey]
+//         }
+//       }
 
-      const vDom = new Element(tagName, propsMap)
-      elements.push(vDom)
-      if (!currentvDom) {
-        currentvDom = vDom
-        return
-      }
+//       const vDom = new Element(tagName, propsMap)
+//       elements.push(vDom)
+//       if (!currentvDom) {
+//         currentvDom = vDom
+//         return
+//       }
 
-      if (currentvDom) {
-        currentvDom.children.push(vDom)
-        currentvDom = vDom
-        return
-      }
-    },
-    end: (tagName) => {
-      elements.length -= 1
-      if (elements.length > 0) {
-        currentvDom = elements[elements.length - 1]
-      }
-    },
-    chars: (text) => {
-      if (data) {
-        const match = text.match(dynamicVariable)
-        if (match) {
-          const [_, variable] = match
-          currentvDom.children.push(data[variable])
-        }
-        if (!match) {
-          currentvDom.children.push(text)
-        }
-      }
+//       if (currentvDom) {
+//         currentvDom.children.push(vDom)
+//         currentvDom = vDom
+//         return
+//       }
+//     },
+//     end: (tagName) => {
+//       elements.length -= 1
+//       if (elements.length > 0) {
+//         currentvDom = elements[elements.length - 1]
+//       }
+//     },
+//     chars: (text) => {
+//       if (data) {
+//         const match = text.match(dynamicVariable)
+//         if (match) {
+//           const [_, variable] = match
+//           currentvDom.children.push(data[variable])
+//         }
+//         if (!match) {
+//           currentvDom.children.push(text)
+//         }
+//       }
 
-      if (!data) {
-        currentvDom.children.push(text)
-      }
-    }
-  })
+//       if (!data) {
+//         currentvDom.children.push(text)
+//       }
+//     }
+//   })
 
-  return currentvDom
-}
+//   return currentvDom
+// }
 
-export { htmlVdomParse, Element }
+export { Element }

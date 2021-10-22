@@ -68,17 +68,27 @@ function diffProps(oldProps, newProps, currentIndexPatches) {
   for (const propKey in oldProps) {
     if (!newProps.hasOwnProperty(propKey)) {
       currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_DELETE, key: propKey })
-    } else if (newProps[propKey] !== oldProps[propKey] && propKey !== 'event') {
+    } else if (newProps[propKey] !== oldProps[propKey]) {
       switch (propKey) {
         case 'data':
+        case 'event':
           {
             for (const [key, value] of Object.entries(newProps[propKey])) {
               if (!oldProps[propKey].hasOwnProperty(key)) {
-                currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_ADD, key, value })
+                currentIndexPatches.push({
+                  type: propKey === 'data' ? patchType.NODE_VALUE_ADD : patchType.NODE_EVENT_ADD,
+                  key,
+                  value
+                })
               }
 
               if (oldProps[propKey].hasOwnProperty(key) && oldProps[propKey][key] !== newProps[propKey][key]) {
-                currentIndexPatches.push({ type: patchType.NODE_ATTRIBUTE_MODIFY, key, value })
+                currentIndexPatches.push({
+                  type: propKey === 'data' ? patchType.NODE_VALUE_MODIFY : patchType.NODE_EVENT_MODIFY,
+                  key,
+                  value,
+                  old: oldProps[propKey][key]
+                })
               }
             }
           }

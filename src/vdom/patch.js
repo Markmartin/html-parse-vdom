@@ -31,17 +31,29 @@ function dfsWalk(dom, index, patches, isEnd = false) {
       }
 
       if (type === patchType.NODE_ATTRIBUTE_ADD || type === patchType.NODE_ATTRIBUTE_MODIFY) {
-        if (dom.tagName === 'INPUT' && patch.key === 'value') {
-          dom[patch.key] = patch.value
-        } else {
-          dom.setAttribute(patch.key, patch.value)
-        }
-
+        dom.setAttribute(patch.key, patch.value)
         return
       }
 
       if (type === patchType.NODE_ATTRIBUTE_DELETE) {
         dom.removeAttribute(patch.key, patch.value)
+        return
+      }
+
+      if (type === patchType.NODE_VALUE_ADD || type === patchType.NODE_VALUE_MODIFY) {
+        dom[patch.key] = patch.value
+        return
+      }
+
+      if (type === patchType.NODE_EVENT_ADD || type === patchType.NODE_EVENT_MODIFY) {
+        if (type === patchType.NODE_EVENT_MODIFY) {
+          dom.removeEventListener(patch.key, patch.old)
+        }
+        dom.addEventListener(patch.key, function (e) {
+          if (typeof patch.value === 'function') {
+            patch.value(e.target.value)
+          }
+        })
         return
       }
     })
